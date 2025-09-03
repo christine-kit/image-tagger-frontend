@@ -1,0 +1,32 @@
+name: Build vue and deploy to S3
+run-name: Build and deploy to S3 by @${{ github.actor }}
+on: [push]
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24.4.1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build 
+        run: |
+          echo "VITE_API_URL=$VITE_API_URL" >> $GITHUB_ENV
+          npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          
+      - name: Deploy to S3
+        run: aws s3 sync dist/ ${{ secrets.AWS_S3_BUCKET }} --delete
