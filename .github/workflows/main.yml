@@ -1,6 +1,9 @@
 name: Build vue and deploy to S3
 run-name: Build and deploy to S3 by @${{ github.actor }}
 on: [push, workflow_dispatch]
+permissions:
+  id-token: write
+  contents: read
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
