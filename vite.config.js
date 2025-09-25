@@ -9,7 +9,6 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 export default defineConfig( ({ mode })=> {
   const env = loadEnv(mode, process.cwd());
   const proxyUrl = env.VITE_API_PROXY_URL;
-  console.log(proxyUrl)
   return {
     plugins: [
       vue(),

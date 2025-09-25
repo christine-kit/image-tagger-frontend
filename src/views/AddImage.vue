@@ -37,7 +37,6 @@ const description = ref('')
 const isSubmitting = ref(false)
 const error = ref(null)
 const apiUrl = import.meta.env.VITE_API_URL
-console.log('api url:', apiUrl)
 async function submitImage() {
   if (!url.value.trim()) {
     error.value = 'Image URL is required.'

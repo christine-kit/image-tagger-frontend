@@ -97,7 +97,7 @@ const onEnter = async () => {
   // create new tag if tag doesn't exist
   if (!tagExists) {
     try {
-      const response = await fetch('/api/newTag', {
+      const response = await fetch('/api/addNewTag', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json'},
         body: JSON.stringify({
