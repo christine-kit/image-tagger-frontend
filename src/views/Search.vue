@@ -13,7 +13,7 @@
         @keydown.enter.prevent="addTag"
         @keydown.space.prevent="addTag"
         @keydown.backspace="handleBackspace"
-        placeholder="Type a tag..."
+        :placeholder="inputTags.length === 0 && inputValue === '' ? 'Type a tag, or hit search for untagged images' : ''"
         class="tag-input"
       />
     </div>
@@ -22,20 +22,7 @@
       Search
     </button>
 
-    <div class="image-list">
-      <div 
-        v-for="(image, index) in imageData" 
-        :key="index" 
-        class="image-item"
-      >
-        <RouterLink :to="`/image/${image.primary_id}`">
-          <img :src="image.url" :alt="image.image_name" class="image-preview" />
-        </RouterLink>
-        <RouterLink :to="`/image/${image.primary_id}`" class="image-name">
-          {{ image.image_name }}
-        </RouterLink>
-      </div>
-    </div>
+    <ImageList :imageList="imageIds"/>
   </div>
 </template>
 
@@ -47,6 +34,7 @@ Function flow:
 */
 import { onMounted, ref } from 'vue'
 import Tag from '@/components/Tag.vue'
+import ImageList from '@/components/ImageList.vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
@@ -54,7 +42,7 @@ const router = useRouter()
 
 const inputValue = ref('')
 const inputTags = ref([])
-const imageData = ref([])
+const imageIds = ref([])
 const apiUrl = import.meta.env.VITE_API_URL
 
 // if there are tags in query params, populate input field with those tags,
@@ -103,7 +91,11 @@ function handleBackspace() {
 }
 
 function handleSearch() {
-  imageData.value = []
+  imageIds.value = []
+  if (inputTags.value.length === 0) {
+    fetchUntaggedImages();
+    return;
+  }
   router.push({
     path:'/search',
     query: {tags: inputTags.value}
@@ -111,6 +103,23 @@ function handleSearch() {
   fetchImages(inputTags.value)
 }
 
+async function fetchUntaggedImages() {
+  console.log("fetching untagged images");
+  try {
+    const response = await fetch(
+      `${apiUrl}/getUntaggedImages`,
+      {
+        method: 'GET'
+      }
+    );
+    imageIds.value = await response.json()
+    console.log(imageIds.value)
+  } catch (err) {
+    console.error('Could not fetch untagged images', err)
+  }
+}
+
+// query for images by list of tags, populate imageIds list with results
 async function fetchImages(tagList) {
   if (tagList.length == 0) {
     return
@@ -120,46 +129,15 @@ async function fetchImages(tagList) {
     .join('&')
   const url = `${apiUrl}/queryImagesByTag?${queryString}`
   try {
+    console.log('querying images by tags')
     const response = await fetch(url, {
       method: 'GET'
     })
-    const imageIds = await response.json()
-    console.log('image ids:', imageIds)
-    fetchImageData(imageIds)
+    imageIds.value = await response.json()
+    console.log('image ids fetched')
   } catch (err) {
-    console.error('Could not fetch image data', err)
+    console.error('Could not fetch image ids', err)
   }
-}
-
-async function fetchImageData(imageIds) {
-  const chunks = chunkArray(imageIds, 10);
-
-  for (const chunk of chunks) {
-    const query = chunk.map(id => `id=${encodeURIComponent(id)}`).join('&');
-    const url = `${apiUrl}/getImage?${query}`
-
-    try {
-      const res = await fetch(url, {
-        method: 'GET'
-      });
-      if (!res.ok) {
-        throw new Error(`Failed to fetch chunk: ${chunk.join(', ')}`)
-      }
-      const chunkData = await res.json()
-      imageData.value.push(...chunkData)
-    } catch (err) {
-      console.error('Error when fetching image data:', err)
-    }
-  }
-  console.log('new image data array:', imageData.value)
-}
-
-function chunkArray(array, size) {
-  const chunks = []
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
-  }
-  return chunks;
 }
 </script>
 
