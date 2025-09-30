@@ -1,6 +1,22 @@
 <template>
-  <div class="display-image">
-    <h1>Image</h1>
+  <div class="display-image" >
+    <div class="image-header">
+      <h1>
+        <span v-if="imageData?.image_name && imageData.image_name.trim()">
+          {{ imageData.image_name }}
+        </span>
+        <span v-else class="placeholder">(no image name)</span>
+      </h1>
+      <button class="delete-button" @click="showConfirm = true">Delete Image</button>
+    </div>
+
+    <div v-if="showConfirm" class="confirm-overlay">
+      <div class="confirm-box">
+        <p>Are you sure you want to delete this image?</p>
+        <button @click="confirmDelete">Yes, delete</button>
+        <button @click="showConfirm = false">Cancel</button>
+      </div>
+    </div>
 
     <div v-if="error" class="error">
       <p>Error: {{ error }}</p>
@@ -19,43 +35,51 @@
       />
       <p v-else class="error">Failed to load image from URL.</p>
 
-      <h2>{{ imageData.image_name }}</h2>
-      <p>{{ imageData.description }}</p>
+      
+      <p>
+        <span v-if="imageData?.description && imageData.description.trim()">
+          {{ imageData.description}}
+        </span>
+        <span v-else class="placeholder">(no description)</span>
+      </p>
     </div>
-  </div>
-  <div class="tag-list">
-    <Tag
-      v-for="(tag, index) in tags"
-      :key="index"
-      :tagId="tag.tagId"
-      :pending="tag.pending"
-      @removeTag="handleRemoveTag"
-    />
-    <button class="add-tag-button" 
-      v-if="!isAddingTag" @click="isAddingTag = true">
-      +
-    </button>
-    <TagInput
-      v-else
-      @addTag="addTag"
-      @cancel="isAddingTag = false"
-      @blurred="onInputBlurred"
-      :initialValue="savedInputText"
-    />
+
+    <div class="tag-list">
+      <Tag
+        v-for="(tag, index) in tags"
+        :key="index"
+        :tagId="tag.tagId"
+        :pending="tag.pending"
+        @removeTag="handleRemoveTag"
+      />
+      <button class="add-tag-button" 
+        v-if="!isAddingTag" @click="isAddingTag = true">
+        +
+      </button>
+      <TagInput
+        v-else
+        @addTag="addTag"
+        @cancel="isAddingTag = false"
+        @blurred="onInputBlurred"
+        :initialValue="savedInputText"
+      />
+    </div>
   </div>
 </template>
 
 <script setup>
-import { defineProps } from 'vue'
-import { ref, onMounted } from 'vue'
+import { defineProps, ref, onMounted, inject } from 'vue'
+import { useRouter } from 'vue-router'
 
 import Tag from '@/components/Tag.vue'
 import TagInput from '@/components/TagInput.vue'
 import { nextTick } from 'vue'
 
+const router = useRouter()
 const props = defineProps({
   id: String
 })
+const toast = inject('toast');
 
 const imageData = ref({});
 const error = ref(null);
@@ -64,6 +88,7 @@ const imageLoadError = ref(false);
 const tags = ref([]);
 const isAddingTag = ref(false);
 const savedInputText = ref('');
+const showConfirm = ref(false)
 const apiUrl = import.meta.env.VITE_API_URL
 
 onMounted(async () => {
@@ -84,6 +109,7 @@ async function fetchTags() {
     tags.value = tagData.map(tag => ({tagId: tag, pending:false}));
   } catch (err) {
     console.error('Failed to fetch tags:', err);
+    toast('Failed to fetch tags', 'error')
   }
 }
 
@@ -96,11 +122,36 @@ async function fetchImageData() {
       throw new Error(`Server returned ${response.status}`);
     }
     const data = await response.json();
+    if (!data[0]) {
+      throw new Error(`Image with id ${props.id} does not exist`);
+    }
     imageData.value = data[0];
   } catch (err) {
+    imageLoadError.value = true;
     error.value = err.message;
+    toast('Failed fetch image', 'error')
   } finally {
     loading.value = false;
+  }
+}
+
+async function confirmDelete() {
+  try {
+    const response = await fetch(`/api/deleteImage?id=${props.id}`, {
+      method: 'DELETE'
+    });
+    if (response.ok) {
+      console.log('Image deleted');
+      toast('Image deleted successfully');
+      router.push('/');
+    } else {
+      console.error('Delete failed');
+    }
+  } catch (error) {
+    console.error('Error deleting image', error);
+    toast('Error deleting image', 'error')
+  } finally {
+    showConfirm.value = false;
   }
 }
 
@@ -136,6 +187,7 @@ async function addTagToImage(tag) {
     }
   } catch (err) {
     console.error('Failed to add tag to image');
+    toast('Failed to add tag to image', 'error')
   }
 }
 
@@ -159,15 +211,21 @@ async function handleRemoveTag(tagId) {
     tags.value = tags.value.filter(tag => tag.tagId != tagId)
   } catch (err) {
     console.log('Could not remove tag', tagId)
+    toast(`Failed to remove tag ${tagId}`, 'error')
   }
 }
 </script>
 
 <style scoped>
-.display-image {
-  max-width: 600px;
-  margin: 0 auto;
-  text-align: center;
+.image-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.placeholder {
+  color: gray;
+  font-weight: normal;
 }
 
 img {
@@ -204,5 +262,25 @@ img {
 
 .add-tag-button:hover {
   background-color: #d0d0d0; /* Slightly darker on hover */
+}
+
+/* Confirmation popup styles */
+.confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.confirm-box {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
 }
 </style>
